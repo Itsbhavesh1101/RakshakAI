@@ -1,0 +1,80 @@
+services:
+  rakshak-platform:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rakshak-platform
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      PROJECT_ROOT: /app
+      FRONTEND_DIST_DIR: /app/frontend/dist
+      ALERTS_DB_PATH: /data/alerts.db
+      SNAPSHOTS_DIR: /data/snapshots
+      UPLOADS_DIR: /data/uploads
+      SOURCE_TYPE: ${SOURCE_TYPE:-webcam}
+      VIDEO_FILEPATH: ${VIDEO_FILEPATH:-}
+      CAMERA_DEVICE_ID: ${CAMERA_DEVICE_ID:-0}
+      FRAME_WIDTH: ${FRAME_WIDTH:-640}
+      FRAME_HEIGHT: ${FRAME_HEIGHT:-480}
+      TARGET_FPS: ${TARGET_FPS:-20}
+      INFERENCE_FPS: ${INFERENCE_FPS:-2}
+      JPEG_QUALITY: ${JPEG_QUALITY:-65}
+      MODEL_IMGSZ: ${MODEL_IMGSZ:-416}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
+      SCENE_MEMORY_ENABLED: ${SCENE_MEMORY_ENABLED:-true}
+      SCENE_MEMORY_BACKEND: ${SCENE_MEMORY_BACKEND:-redis}
+      SCENE_MEMORY_REDIS_URL: ${SCENE_MEMORY_REDIS_URL:-redis://rakshak-redis:6379/0}
+      SCENE_MEMORY_KEY_PREFIX: ${SCENE_MEMORY_KEY_PREFIX:-rakshak:scene_memory}
+      SCENE_MEMORY_MAX_EVENTS: ${SCENE_MEMORY_MAX_EVENTS:-500}
+      SCENE_MEMORY_TTL_SECONDS: ${SCENE_MEMORY_TTL_SECONDS:-900.0}
+      SCENE_MEMORY_DEDUPE_SECONDS: ${SCENE_MEMORY_DEDUPE_SECONDS:-2.0}
+      SCENE_MEMORY_TIMELINE_LIMIT: ${SCENE_MEMORY_TIMELINE_LIMIT:-25}
+      SCENE_MEMORY_OBJECT_HISTORY: ${SCENE_MEMORY_OBJECT_HISTORY:-20}
+      SCENE_MEMORY_MIN_SCENE_SCORE: ${SCENE_MEMORY_MIN_SCENE_SCORE:-10}
+      MULTI_AGENT_ENABLED: ${MULTI_AGENT_ENABLED:-true}
+      MULTI_AGENT_FRAMEWORK: ${MULTI_AGENT_FRAMEWORK:-langgraph}
+      MULTI_AGENT_MIN_VERIFICATION_SCORE: ${MULTI_AGENT_MIN_VERIFICATION_SCORE:-0.55}
+      MULTI_AGENT_SUPPRESS_UNVERIFIED: ${MULTI_AGENT_SUPPRESS_UNVERIFIED:-false}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-moondream}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_SERVER: ${SMTP_SERVER:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      FROM_ADDRESS: ${FROM_ADDRESS:-security-alert@platform.com}
+      TO_ADDRESS: ${TO_ADDRESS:-}
+      SMS_ENABLED: ${SMS_ENABLED:-false}
+      TO_PHONE: ${TO_PHONE:-}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+    volumes:
+      - rakshak-data:/data
+    depends_on:
+      rakshak-redis:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+    restart: unless-stopped
+
+  rakshak-redis:
+    image: redis:7-alpine
+    container_name: rakshak-redis
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  rakshak-data:
